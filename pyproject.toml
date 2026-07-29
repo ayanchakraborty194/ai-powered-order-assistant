@@ -1,0 +1,50 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ai-powered-order-assistant"
+version = "0.1.0"
+requires-python = ">=3.11,<3.15"
+description = "AI-powered conversational NL-to-SQL assistant for order processing data."
+dependencies = [
+    "fastapi",
+    "python-dotenv",
+    "uvicorn",
+    "gunicorn",
+
+    # LLM (Gemini only)
+    "langchain-google-genai",
+    "google-genai",
+
+    # Vector search (schema metadata RAG)
+    "langchain_huggingface",
+    "langchain_qdrant",
+    "qdrant_client",
+    "sentence_transformers",
+
+    # Cache / multi-turn state
+    "redis",
+
+    # Order processing database + SQL validation
+    "SQLAlchemy",
+    "psycopg2-binary",
+    "sqlparse",
+]
+
+[project.optional-dependencies]
+dev = [
+    "black==24.10.0",
+    "isort==5.13.2",
+    "ruff==0.8.4",
+    "mypy==1.14.1",
+    "pytest==9.0.2",
+    "httpx==0.28.1",
+]
+
+[tool.isort]
+profile = "black"
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+exclude = ["temp*"]
