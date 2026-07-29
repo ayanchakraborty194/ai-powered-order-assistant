@@ -16,7 +16,9 @@ from app.services.core_services.query_execution_service import (
     query_execution_service,
 )
 from app.services.core_services.sql_validation_service import sql_validation_service
-
+from app.repository.sql_repository.chat_history_repository import (
+    chat_history_repository,
+)
 _PENDING_KEY_PREFIX = "sql_pending_clarification:"
 _PENDING_TTL_SECONDS = 600
 
@@ -40,14 +42,17 @@ class SqlAgent:
             Dict with keys: "answer" (str), "needs_clarification" (bool),
             "sql" (str or None), "source" (str or None).
         """
+        chat_history_repository.add_message(thread_id, role="user", content=query)
         effective_query = self._merge_with_pending(thread_id, query)
 
         intent = intent_agent.detect(effective_query)
 
         if intent.get("missing_info"):
             self._store_pending(thread_id, effective_query)
+            answer = intent["missing_info"]
+            chat_history_repository.add_message(thread_id, role="assistant", content=answer)
             return {
-                "answer": intent["missing_info"],
+                "answer": answer,
                 "needs_clarification": True,
                 "sql": None,
                 "source": None,
@@ -64,18 +69,23 @@ class SqlAgent:
             nl_to_sql_service.remember(effective_query, result)
         except (ValidationError, InternalError) as exc:
             logger.warning("SQL pipeline failed for query=%s: %s", effective_query, exc)
+            answer =  (
+                "I ran into a problem answering that question. Could you "
+                "rephrase it or provide more detail (e.g. an Order ID or "
+                "Customer Name)?"
+            )
+            chat_history_repository.add_message(thread_id, role="assistant", content=answer)
             return {
-                "answer": (
-                    "I ran into a problem answering that question. Could you "
-                    "rephrase it or provide more detail (e.g. an Order ID or "
-                    "Customer Name)?"
-                ),
+                "answer": answer,
                 "needs_clarification": True,
                 "sql": None,
                 "source": None,
             }
 
         answer = responder_agent.format_response(effective_query, rows)
+        chat_history_repository.add_message(
+            thread_id, role="assistant", content=answer, sql=result.sql, source=result.source
+        )
 
         return {
             "answer": answer,
